@@ -166,10 +166,10 @@ In order to calculate the type version hashes so that they are stable and are no
 
 The data structure includes:
 
-- a list of field names and types, but not default values
-- the serialization format
-- the serialization format version
-- an optional user-defined interface version, or 0 if not provided
+- A list of field names and types, but not default values
+- The serialization format
+- The serialization format version
+- An optional user-defined interface version, or 0 if not provided
 
 The resulting data structure is hashed using a standard SHA-1 method, resulting in a standard 160-bit (20-byte) hash value which is also generally known as a "message digest".
 This hash is combined with a "type version hash standard version", the first of which will be ``IDLHASH-1``, with an ``@`` symbol, resulting in a complete type version hash like ``IDLHASH-1@<160-bit SHA-1 of data structure>``.
@@ -182,13 +182,13 @@ The optional user-defined interface version included in the hash allows the user
 Enforcing Type Version
 ~~~~~~~~~~~~~~~~~~~~~~
 
-The type version hash can be used as an additional constraint to determine if two endpoints (publishers and subscriptions) on a topic should communicate.
+If the type version hash is available, it can be used as an additional constraint to determine if two endpoints (publishers and subscriptions) on a topic should communicate.
 
 When creating a publisher or subscription, the caller normally provides: a topic name, QoS settings, and a topic type.
 The topic type is represented as a string and is automatically deduced based on the type given to the create function, e.g. as a template parameter in C++ or the message type as an argument in Python.
 For example, creating a publisher for ``std_msgs::msg::String`` in C++, may result in a topic type like ``std_msgs/msg/String``.
 All of these items are used by the middleware to determine if two endpoints should communicate or not, and this REP proposes that the type version be added to this list of provided information.
-Nothing needs to change from the user's perspective, as the type version can be extracted automatically based on the topic type given, either at the ``rcl`` layer or in the ``rmw`` implementation itself.
+From the user's perspective, nothing needs to change, as the type version can be extracted based on the topic type given either at the ``rcl`` layer or in the ``rmw`` implementation itself.
 However, the type version would become something that the ``rmw`` implementation is provided and aware of in the course of creating a publisher or subscription, and therefore the job of using that information to enforce type compatibility would be left to the middleware, rather than implementing it as logic in ``rcl`` or other packages above the ``rmw`` API.
 
 The method for implementing the detection and enforcement of type version mismatches is left up to the middleware, as some middlewares will have tools to make this efficient and others will implement something like what would be possible in the ``rcl`` and above layers.
