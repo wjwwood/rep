@@ -278,6 +278,13 @@ Such the meta-type description service type would look like:
     string type_support_meta       # Human readable metadata for the type support bytestring
     byte[] type_support            # Implementation specific serialization and deserialization support
 
+Additional Notes for Type Description Meta-Type
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Given that the meta-type description has to be generic enough to support any combination of serialization libraries and formats, there is a high chance that it might need to be changed.
+In these cases, there might be a need to add or remove fields on the meta-type description.
+This should be done in such a way that the fields are tick-tocked and deprecated properly.
+
 Implementation on the `rcl` Layer
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
