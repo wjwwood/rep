@@ -253,13 +253,13 @@ Or it could even include a shared object that can be dynamically loaded and call
 
 All of this type description information will be sent as a ROS 2 service response, as the nodes in the previous section will be queried on the ROS layer.
 
-.. TODO: What happens if the message consumer doesn't have access to the serialization library stated in the meta-type?
+.. TODO:: What happens if the message consumer doesn't have access to the serialization library stated in the meta-type?
 
 The ROS 2 service type that is meant to define the type description data is intended to be a meta-type description that is able to be used across any potential message types, for any potential serialization schemes used with ROS.
 As such, it has to be general enough to account for this.
 Such the meta-type description service type would look like:
 
-.. TODO: We need to confirm this. This is probably very likely to change (e.g. splitting version into 3 numbers for MAJOR, MINOR, PATCH.)
+.. TODO:: We need to confirm this. This is probably very likely to change (e.g. splitting version into 3 numbers for MAJOR, MINOR, PATCH.)
 
 .. code::
 
