@@ -221,7 +221,75 @@ TODO
 Inter-process Type Description Distribution
 -------------------------------------------
 
-.. TODO:: move the draft section over, and make a selection between: telnet/http server per context/participant under rmw layer, service per context/participant under rmw layer, telnet/http server per node under rmw layer, service per node above rmw layer, or some combination with way to configure which should be used.
+If a mismatch in type hashes is found, the types might still be compatible.
+In these cases, the full type description will have to be obtained in order to:
+
+- Confirm type *compatibility* (e.g., the fields are the same, but the version number is different, or fields are implicitly castable)
+- Support runtime type *introspection* (even without access to the message package)
+- Support runtime type *transformation* (e.g., splitting, merging, casting, narrowing, renaming, arithmetic ops, etc.)
+
+All of these features rely on there being some mechanism to communicate the type description across nodes on the network which might be located on different processes and different machines.
+Furthermore, this feature should be agnostic to the underlying middleware and serialization library.
+
+Sending the Type Description
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. TODO:: we should probably decide what the name of that service is somewhere down the line
+
+Type descriptions will be sent as a response to any query of a dedicated ROS service server (``/_query_type_description``) that will be started on initialization of each node on either end of a connection (e.g. publishers and/or subscriptions.)
+There will only be one service started per node, independent of the number of publishers or subscriptions on that node.
+
+A service request to this type description service will comprise of the type name and the version hash, which should be obtainable from the endpoint as specified in the previous section.
+Upon receipt of the request, the service server will then construct a response by matching the request against its local list of available types and type hashes, populating the response with the type description and any necessary metadata, and send it. This service calling process is not expected to happen frequently per node, and is likely to only occur per registration of a new publisher or subscription connection, and even then, only if the endpoint type hashes do not match.
+
+Type Description Contents and Format
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The type description response sent by the server will contain a combination of the original ``idl`` or ``msg`` file, and also any necessary information to serialize and deserialize the raw message buffers sent on the topic.
+It should be noted that the section of the response that represents the ``idl`` or ``msg`` file will contain whitespace and comments, as those might be relevant to interpreting the semantic meaning of the message fields.
+
+This information could include the serialization library used, its version, and the associated buffer offsets.
+Or it could even include a shared object that can be dynamically loaded and called against to do the serialization or deserialization, and the name of the symbol to use.
+
+All of this type description information will be sent as a ROS 2 service response, as the nodes in the previous section will be queried on the ROS layer.
+
+.. TODO: What happens if the message consumer doesn't have access to the serialization library stated in the meta-type?
+
+The ROS 2 service type that is meant to define the type description data is intended to be a meta-type description that is able to be used across any potential message types, for any potential serialization schemes used with ROS.
+As such, it has to be general enough to account for this.
+Such the meta-type description service type would look like:
+
+.. TODO: We need to confirm this. This is probably very likely to change (e.g. splitting version into 3 numbers for MAJOR, MINOR, PATCH.)
+
+.. code::
+
+    string type_name 
+    string version_hash
+    ---
+    bool available                 # True if the type description information is available and populated in the response 
+    string metatype_version        # The version of this metatype descriptor
+
+    string type_description_raw    # The idl or msg file, with comments and whitespace
+    string type_description_parsed # The idl or msg file, in a cleaned form that can be fed into type support
+
+    string serialization_library
+    string serialization_version
+
+    string type_support_meta       # Human readable metadata for the type support bytestring
+    byte[] type_support            # Implementation specific serialization and deserialization support
+
+Implementation on the `rcl` Layer
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The implementation of the type description distribution feature will be made on the ``rcl`` layer as opposed to the ``rmw`` layer to take advantage of the abstraction away from the middleware and to allow for compatibility with the client libraries.
+
+.. TODO: Confirm the approach.
+
+A hook will be added to ``rcl_node_init()`` to initialize the type description distribution service with the appropriate ``rcl_service_XXX()`` functions.
+This hook should also initialize an ``std::unordered_map`` of published and subscribed types which will be populated on each initialization of a publisher or subscription in the respective ``rcl_publisher_init()`` and ``rcl_subscription_init()`` function calls.
+The passed ``rosidl_message_type_support_t`` in the init call can be introspected with getter functions to obtain the relevant information, alongside any new methods added to support type version hashing.
+
+.. TODO: (CH3) The ``rosidl_message_type_support_t`` contains ``void *`` pointers to the type support library. But I don't think it'll be able to get called if the blob is somehow sent over the air because the object wouldn't be available to call against, I think? Likewise with the function, the symbol name would be available, but a process which doesn't have the type support package won't be able to link against it or call it? I'm a little rusty with the type support pipeline.
 
 Runtime Type Introspection
 --------------------------
