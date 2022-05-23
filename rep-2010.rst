@@ -310,6 +310,36 @@ Rationale
 
 TODO
 
+Distributing Type Description via Services, as ``msg`` / ``idl``, on ``rcl``
+----------------------------------------------------------------------------
+
+Sending from Node
+~~~~~~~~~~~~~~~~~
+
+The resolution of the ROS graph and subscriptions afford information about what nodes are publishing or subscribing to any message topic.
+Furthermore, in order for the nodes to register their publisher or subscription in the first place, they must have access to some version of the corresponding message type locally, even if they might have differing versions of the message type.
+Notably, this guarantees that the node itself will have access to the type description, which removes any need to search for the correct service server when querying for type descriptions—a querying node may simply query the node that is advertising the topic.
+
+Type Description as Combination Service Response
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The contents of the type description response sent by the service server should include information that supports most of the major use cases of this feature (namely, tools and type transformation to allow incompatible nodes to communicate.)
+These use cases have orthogonal interests, with the former requiring human-readable descriptions, and the latter preferring machine-usable descriptions.
+
+Furthermore, the constraint to have the type description be usable across middlewares and serialization libraries makes it especially important to send at least whatever information is necessary to regenerate the type support for any middleware or serialization library that is used on the receiving end.
+In this case, because the type support pipeline is a lossy process, and there is a need to ensure that enough information is sent to completely reproduce the original msg file from the msg, losslessly, it makes sense to just send the original ``idl`` or ``msg`` file.
+
+Finally, while there could be an argument for sending a losslessly compressed version of the message file, the expected low frequency of queries to the type description service incurs a negligible overhead that heavily reduces the benefit.
+
+Using ``rcl`` over ``rmw``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+While it is true that implementing the type description distribution on the ``rmw`` layer would allow for much lower level optimization (especially on the networking and middleware layers), removing the layer of abstraction means that any potential users of the feature will be required to look into the ``rmw`` layer, and middleware implementations will also need to be aware of this feature.
+
+Given that the potential gains from optimization will be small due to how infrequently the service is expected to be called, this added development overhead is not a good trade-off.
+It seems much better to have a unified implementation of this feature on ``rcl`` so it is agnostic to any middleware implementations and client libraries, and especially because services are a ROS construct.
+However, the network performance will need to be monitored as this feature is being developed to see if all the extra services (even if they are hidden to the user) will necessitate using ``rmw`` instead of ``rcl``.
+
 Alternatives
 ------------
 
