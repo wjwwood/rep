@@ -360,6 +360,36 @@ Prevent Communication of Mismatched Versions "Above" rmw Layer
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 TODO
 
+Inter-process Type Description Distribution
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Other Providers of Type Description
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Several other candidate entities for provisioning the type description were considered but ultimately disregarded for reasons relating to either causing strong dependency on a middleware or a third-party technology, difficulties with resolving the message type description locally, difficulties with finding the correct entity to query, or causing network throughput issues.
+
+These are some of the candidates that were considered, and the reasons for rejection:
+
+- Store the type description as a ROS parameter
+   * Causes a mass of parameter event messages being sent at once on init, worsening the network initialization problem
+- Store the type description on a centralized node per machine
+   * Helps reduce network bandwidth, but makes it non-trivial to find the correct centralized node to query, and introduces issues of resolving the local message package, such as when nodes are started from different sourced workspaces.
+- Send type description alongside discovery with middlewares
+   * Works very well if supported, but is only supported by some DDS implementations (which support XTypes or some other way to attach discovery metadata), but causes a strong dependency on DDS.
+- Send type description using a different network protocol
+   * Introduces additional third-party dependencies separate from ROS and the middleware.
+
+Alternative Type Description Contents and Format
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A combination of the original ``idl`` / ``msg`` file and serialization/deserialization specific objects being sent allows for one to cover the weaknesses of the other.
+Specifically, given that certain use-cases (e.g., ``rosbag``) might encounter situations where consumers of a message are using a different middleware or serialization scheme the message was serialized with, it becomes extremely important to send enough information to both reconstruct the type support, and also allow the message fields to be accessed in a human readable fashion to aid in the writing of transfer functions.
+As such, it is not a viable option to only send one or the other.
+
+Additionally, the option to add a configuration option to choose what contents to receive from the service server was disregarded due to how infrequently the type description query is expected to be called.
+
+As for message format, using the ROS service type as opposed to an alternative format like XML, JSON, or something DDS specific like XTypes, allows for greater support with the messaging scheme (ROS services) chosen, and also prevents unnecessary coupling with third-party specifications that could be subject to change.
+
 
 Backwards Compatibility
 =======================
