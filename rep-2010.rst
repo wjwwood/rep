@@ -328,6 +328,7 @@ These use cases have orthogonal interests, with the former requiring human-reada
 
 Furthermore, the constraint to have the type description be usable across middlewares and serialization libraries makes it especially important to send at least whatever information is necessary to regenerate the type support for any middleware or serialization library that is used on the receiving end.
 In this case, because the type support pipeline is a lossy process, and there is a need to ensure that enough information is sent to completely reproduce the original msg file from the msg, losslessly, it makes sense to just send the original ``idl`` or ``msg`` file.
+This also makes it important to send sufficient metadata about the serialization library and version used, since the type support pipeline for the serialized message might have changed, and that support information will be useful to resolve the changes.
 
 Finally, while there could be an argument for sending a losslessly compressed version of the message file, the expected low frequency of queries to the type description service incurs a negligible overhead that heavily reduces the benefit.
 
