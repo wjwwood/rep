@@ -321,7 +321,214 @@ The passed ``rosidl_message_type_support_t`` in the init call can be introspecte
 Runtime Type Introspection
 --------------------------
 
-.. TODO:: terminology could be better? nothing off the top of my head, just deserves more bike-shedding.
+The ability to detect type mismatches and obtain the type description in the event of a mismatch in the previous two sections enables the ability to do runtime type introspection.
+
+Specifically, this feature should allow access to the data and fields in a serialized message buffer when given:
+
+- the raw ``uint8[]`` message buffer
+- the message's type description, from inter-process type description distribution
+- the version and name of the serialization library used to serialize the message
+
+From these inputs, we should be able to access the data as fields in the message buffer through some programmatic interface, including:
+
+- a list of field names
+- a list of field types
+- access to the field by name or index as a type
+
+.. code::
+
+            message_buffer ─┐   ┌────────────────────────────┐
+                            │   │                            │
+       message_description ─┼──►│ Runtime Type Introspection ├───► Introspection Interface
+                            │   │                            │
+      serialization_format ─┘   └────────────────────────────┘
+
+Given that the scope of inputs and expected outputs is so limited, this feature should be implemented as a separate package (e.g., ``rcl_serialization``) that can be called independently by any downstream packages that might need runtime type introspection (e.g. ROS, rosbag transport, etc.)
+
+Furthermore, it is important to note that this feature is distinguished from ROS 2's "dynamic" type support (``rosidl_typesupport_introspection_c``) in that "dynamic" type support generates type support code at compile time that then is not expected to change, whereas this feature aims to support any arbitrary message type descriptions at runtime.
+Crucially, this means that a node will not need access to a message's type description at compile time in order to be able to support it, since it will be able to receive and utilize the type description with this feature, in contrast to "dynamic" type support, which would require it.
+
+Requirements
+^^^^^^^^^^^^
+
+In order for runtime type introspection to work, message buffers still need to be able to be transmitted and received, as such, this feature is expected to work if and only if:
+
+- the producers (publishers) and consumers (subscribers) of the message are using compatible RMW implementations
+- the consumer has access to a compatible version of the serialization library described in the message type description
+- the serialization libraries expected to be used with this feature support at least sequential access to message buffer data members with a runtime programmatic interface
+
+Furthermore, this feature will be implemented as a C library to allow for maximum interoperability with the ROS client libraries (e.g. C++, Python, Rust, etc.)
+
+Plugin Interface
+^^^^^^^^^^^^^^^^
+
+As runtime type introspection is expected to work across any arbitrary serialization library, functionality has to be built in to allow for the loading of the necessary serialization libraries required by the message type description.
+Serialization library support in this case will be provided by writing plugins that wrap the serialization libraries that can then plug in dynamically to the runtime type introspection feature using a unified plugin interface. Then, runtime type introspection will:
+
+- enumerate the supported serialization library plugins on the machine
+- match, if possible, the serialization format specified in the message type description to an appropriate plugin (throwing a warning otherwise)
+- dynamically load the plugin
+
+These serialization library plugins must wrap functionality to:
+
+- determine suitability for use with a message's reported serialization version and type
+- parse the ``.idl`` / ``.msg`` component of the message description into a serialization library usable form
+- given that parsed description (which provides type reflection information about the message buffer), deserialize the message buffer using the serialization library
+
+In particular, the step of parsing the ``.idl``  / ``.msg`` file is necessary because there might be serialization library or type support specific steps or considerations (e.g. field re-ordering, endianness) that would not be captured in the ``.idl`` / ``.msg`` file, because they would have been assumed to have been applied during type support.
+
+Dealing with Multiple Applicable Plugins for A Serialization Format
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+In the case where there exists multiple applicable plugins for a particular serialization format, the plugin matching should follow this priority order:
+
+- user specified overrides passed to the matching function
+- defaults defined in the plugin matching function, if applicable, otherwise
+- the first suitable plugin in alphanumeric sorting order
+
+
+
+Example Plugin Interface
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+Plugin Matching and Loading
+"""""""""""""""""""""""""""
+
+The following is an example of how this plugin matching and loading interface could look like, defining new ``rcl`` interfaces; with a plugin wrapping FastCDR v1.0.24 for serialization, with some arbitrary message type `Foo`:
+
+.. code::
+
+    // Suppose FooDescription reports that it uses FastCDR v1.0.24 for its serialization
+    rcl_message_description_t FooDescription = node->get_type_description("/foo_endpoint_name");
+
+    rcl_type_introspection_t * introspection_handle;
+    introspection_handle->init();  // Locate local plugins here
+
+    // Plugin name: "fastcdr_v1_0_24"
+    const char * plugin_name = introspection_handle->match_plugin(FooDescription->get_serialization_format());
+    rcl_serialization_plugin_t * plugin = introspection_handle->load_plugin("fastcdr_v1_0_24");
+
+    // If we wanted to force the use of MicroCDR instead
+    introspection_handle->match_plugin(FooDescription->get_serialization_type(), "microcdr");
+
+Then, the plugin should be able to use the description to deserialize the message buffer using the plugin:
+
+.. code::
+
+    rcl_deserialized_message_t * foo_msg;
+    introspection_handle->deserialize(&plugin, message_buffer, &FooDescription, foo_msg);
+
+    // Where, internally...
+    // rcl_type_introspection_t->(*deserialize)
+    void deserialize(rcl_serialization_plugin_t *plugin,
+                     void *buffer,
+                     rcl_message_description_t *description,
+                     rcl_deserialized_message_t *msg)
+    {
+      ...
+
+      // Do something serialization specific
+      plugin_internal_description_t parsed_description = plugin->impl->parse_description(description);
+      plugin->impl->deserialize(buffer, parsed_description, msg);
+
+      ...
+    }
+
+Plugin Deserialization
+""""""""""""""""""""""
+
+One way a serialization library plugin for FastCDR could be implemented could be as follows, relying on the serialization library to deserialize the message buffer, but with the provided type description to supply type reflection information:
+
+.. code::
+
+    #include <FastBuffer.h>
+    #include <FastCdr.h>
+
+    // If the parsed description is iterable
+    // rcl_serialization_plugin_t->(*deserialize)
+    void deserialize(void *buffer,
+                     plugin_internal_description_t *description,
+                     rcl_deserialized_message_t *msg)
+    {
+      FastCdr * cdr = new FastCdr(new FastBuffer((char *)buffer, description->buffer_length));
+
+      msg->message_field_names = new char*[description->num_fields];
+      msg->message_types = new char*[description->num_fields];
+
+      for (int i = 0; i < description->num_fields; i++)
+      {
+        const char * type = description->field_types[i];
+
+        // Primitives
+        if (strcmp(type, "bool") == 0)
+        {
+          bool tmp;
+        }
+        else if (strcmp(type, "char") == 0)
+        {
+          char tmp;
+        }
+        ...
+
+        // TODO:: What to do about nested types? A recursive unpacking call with a different description?
+
+        cdr >> tmp;
+        msg->message_fields[description->field_names[i]] = reinterpret_cast<void *>(tmp);
+
+        msg->message_field_names[i] = description->field_names[i];
+        msg->message_types[i] = description->field_types[i];
+      }
+      msg->message_field_count = description->num_fields;
+    }
+
+Example Introspection API
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Once the serialization library plugins are able to deserialize the raw message buffer, downstream programs can then introspect the constructed deserialized message object, which should be laid out as such:
+
+.. code::
+
+    struct rcl_deserialized_field_t {
+        void * value;
+        char * type;
+    }
+
+    struct rcl_deserialized_message_t {
+        int message_field_count;
+        const char** message_field_names;
+        const char** message_types;
+
+        // Some dynamically allocated key->value associative map type storing void * field values
+        rcl_associative_array message_fields;
+
+        // Function pointers
+        rcl_deserialized_field_t * (*get_field_by_index)(int index);
+    };
+
+Now, for a given message description `Foo.msg`:
+
+.. code::
+
+    // Foo.msg
+    bool bool_field
+    char char_field
+    float32 float_field
+
+The corresponding `rcl_deserialized_message_t` can be queried accordingly:
+
+.. code::
+
+    rcl_deserialized_message_t * foo_msg;
+    foo_msg->message_field_names[0];  // "bool_field"
+    foo_msg->message_types[0];  // "bool"
+
+    // Get the field
+    if (strcmp("bool", foo_msg->get_field_by_index(0)->type) == 0)
+    {
+        *((bool*)foo_msg->get_field_by_index(0)->value);
+    }
+
+.. TODO:: Create pseudocode/definitions for sequences and arbitrarily nested message descriptions.
 
 
 
