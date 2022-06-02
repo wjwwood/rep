@@ -221,14 +221,17 @@ TODO
 Inter-process Type Description Distribution
 -------------------------------------------
 
-If a mismatch in type hashes is found, the types might still be compatible.
-In these cases, the full type description will have to be obtained in order to:
+For some use cases the type version hash is insufficient and instead the full type description is required.
 
-- Confirm type *compatibility* (e.g., the fields are the same, but the version number is different, or fields are implicitly castable)
-- Support runtime type *introspection* (even without access to the message package)
-- Support runtime type *transformation* (e.g., splitting, merging, casting, narrowing, renaming, arithmetic ops, etc.)
+One of those use cases, which is also described in this REP, is "runtime type introspection", which is the ability to introspect the contents of a message at runtime when the description for that message, or that version of that message, was unavailable at compile time.
+In this use case the type description is used to interpret the serialized data dynamically.
 
-All of these features rely on there being some mechanism to communicate the type description across nodes on the network which might be located on different processes and different machines.
+Another use case, which is not covered in this REP, is using the type description in tooling to either display the type description to the user or to include it in recordings like rosbags.
+
+In either case, where the type description comes from doesn't really matter, and so, for example, it could be looked up on the local filesystem or read from a rosbag file.
+However, in practice, the correct type description may not be found locally, especially in cases where you have different versions of messages in the same system, either because it's on another computer or perhaps because it is from a different distribution of ROS or was built in a different workspace.
+
+So, it is useful to have a mechanism to convey the type descriptions from the source of the data to other nodes, which we describe here as "type description distribution".
 Furthermore, this feature should be agnostic to the underlying middleware and serialization library.
 
 Sending the Type Description
@@ -236,20 +239,20 @@ Sending the Type Description
 
 .. TODO:: we should probably decide what the name of that service is somewhere down the line
 
-Type descriptions will be sent as a response to any query of a dedicated ROS service server (``/_query_type_description``) that will be started on initialization of each node on either end of a connection (e.g. publishers and/or subscriptions.)
-There will only be one service started per node, independent of the number of publishers or subscriptions on that node.
+Type descriptions will be sent as a response to any query of a dedicated ROS service server (``~/_get_type_description``) that will be started on initialization of each node on either end of a connection (e.g. publishers and/or subscriptions.)
+There will be a single ROS service per node, regardless of the number of publishers or subscriptions on that node.
 
 A service request to this type description service will comprise of the type name and the version hash, which should be obtainable from the endpoint as specified in the previous section.
-Upon receipt of the request, the service server will then construct a response by matching the request against its local list of available types and type hashes, populating the response with the type description and any necessary metadata, and send it. This service calling process is not expected to happen frequently per node, and is likely to only occur per registration of a new publisher or subscription connection, and even then, only if the endpoint type hashes do not match.
+The service server will reply with the type description and any necessary metadata needed to do runtime type introspection.
+This service is not expected to be called frequently, and is likely to only occur when new topic or service endpoints are created, and even then, only if the endpoint type hashes do not match.
 
 Type Description Contents and Format
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The type description response sent by the server will contain a combination of the original ``idl`` or ``msg`` file, and also any necessary information to serialize and deserialize the raw message buffers sent on the topic.
-It should be noted that the section of the response that represents the ``idl`` or ``msg`` file will contain whitespace and comments, as those might be relevant to interpreting the semantic meaning of the message fields.
+The response sent by the service server will contain a combination of the original ``idl`` or ``msg`` file's content, as well as any necessary information to serialize and deserialize the raw message buffers sent on the topic.
+The response will contain a version of the description that contains comments from the original type description, as those might be relevant to interpreting the semantic meaning of the message fields.
 
-This information could include the serialization library used, its version, and the associated buffer offsets.
-Or it could even include a shared object that can be dynamically loaded and called against to do the serialization or deserialization, and the name of the symbol to use.
+Additionally, the response could include the serialization library used, its version, or any other helpful information from the original producer of the data.
 
 All of this type description information will be sent as a ROS 2 service response, as the nodes in the previous section will be queried on the ROS layer.
 
