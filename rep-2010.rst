@@ -264,10 +264,10 @@ The final form of these interfaces should be found in the reference implementati
 
 .. code::
 
-    string type_name 
+    string type_name
     string version_hash
     ---
-    bool successful  # True if the type description information is available and populated in the response 
+    bool successful  # True if the type description information is available and populated in the response
     string failure_reason  # Empty if 'successful' was true, otherwise contains details on why it failed
 
     string type_description_raw  # The idl or msg file, with comments and whitespace
