@@ -273,7 +273,7 @@ The final form of these interfaces should be found in the reference implementati
     string failure_reason  # Empty if 'successful' was true, otherwise contains details on why it failed
 
     string type_description_raw  # The idl or msg file, with comments and whitespace
-    TypeDescription type_description  # The parse type description which can be used programmatically
+    TypeDescription type_description  # The parsed type description which can be used programmatically
 
     string serialization_library
     string serialization_version
@@ -290,17 +290,72 @@ And the ``IndividualTypeDescription`` type:
 
 .. code::
 
-    FIELD_TYPE_INT = 0
-    FIELD_TYPE_DOUBLE = 1
-    # ... and so on
-
-    uint8_t[] field_types
+    string   type_name
+    string[] field_types
     string[] field_names
 
 These naive examples of the interfaces just give an idea of the structure but perhaps do not yet consider some other complications like field annotations and more advanced IDL (generically all "interface description languages" not just the OMG-IDL that DDS uses) have.
 
-.. TODO:: Should we use strings instead of integer enum for the ``field_types``?
+.. TODO:: Should we use strings instead of integer enum for the ``field_types``? (methylDragon: We should use strings to support custom/nested types.)
 
+Nested TypeDescription Example
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The ``TypeDescription`` message type shown above also supports the complete description of a type that contains other types (a nested type), up to an arbitrary level of nesting.
+Consider the following example:
+
+.. code::
+
+  # A.msg
+  B b
+  C c
+
+  # B.msg
+  bool b_bool
+
+  # C.msg
+  D d
+
+  # D.msg
+  bool d_bool
+
+The corresponding ``TypeDescription`` for ``A.msg`` will be as follows:
+
+.. code::
+
+  # A: TypeDescription
+  type_description: A_IndividualTypeDescription
+  referenced_type_descriptions: [B_IndividualTypeDescription,
+                                 C_IndividualTypeDescription,
+                                 D_IndividualTypeDescription]
+
+With the referenced type descriptions accessible as ``IndividualTypeDescription`` types in the ``referenced_type_descriptions`` field of ``A`` (and also for `A`, its own ``type_description`` field.
+In the case where a type description contains no referenced types (i.e., when it has no fields, or all of its fields are primitive types), the ``referenced_type_descriptions`` array will be empty.
+
+.. code::
+
+  # A: IndividualTypeDescription
+  type_name: "A"
+  field_types: ["B", "C"]
+  field_names: ["b", "c"]
+
+  # B: IndividualTypeDescription
+  type_name: "B"
+  field_types: ["bool"]
+  field_names: ["b_bool"]
+
+  # C: IndividualTypeDescription
+  type_name: "C"
+  field_types: ["D"]
+  field_names: ["d"]
+
+  # D: IndividualTypeDescription
+  type_name: "D"
+  field_types: ["bool"]
+  field_names: ["d_bool"]
+
+In order to handle the type of a nested type such as ``A``, the receiver can use the ``referenced_type_descriptions`` array as a lookup table keyed by ``type_name`` to obtain the type information of a referenced type.
+This type handling process can also support any recursive level of nesting (e.g. while handling A, C is encountered as a nested type, C can then be looked up using the top level ``referenced_type_descriptions`` array).
 
 Additional Notes for TypeDescription Message Type
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -577,6 +632,54 @@ Additionally, the option to add a configuration option to choose what contents t
 
 As for the format of the type description, using the ROS interfaces to describe the type, as opposed to an alternative format like XML, JSON, or something like the TypeObject defined by DDS-XTypes, makes it easier to embed in the ROS Service response.
 It also prevents unnecessary coupling with third-party specifications that could be subject to change and reduces the formats that need to be considered on the receiving end of the ROS Service call.
+
+TypeDescription Structure
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Representing Field Type as Strings
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The choice to use a ``string`` array as opposed to a ``uint8`` array to represent the field types of a description is to support custom user-defined type names.
+
+If, however, space becomes a concern (e.g. when discovery causes network bandwidth usage to spike), it would be advisable to instead define the ``TypeDescription`` type as such:
+
+.. code::
+
+  string[] field_definitions
+  uint8_t[] field_types
+  string[] field_names
+
+Where ``field_types`` stores indices to ``field_definitions``, such that the message:
+
+.. code::
+
+  # example.msg
+  uint8 a
+  B b
+  C c
+  uint8 d
+
+Results in the following ``TypeDescription``:
+
+.. code::
+
+  field_definitions: ["uint8", "B", "C"]
+  field_types: [0, 1, 2, 0]
+  field_names: ["a", "b", "c", "d"]
+
+
+Using an Array to Store Referenced Types
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Some alternatives to using an array of type descriptions to store referenced types in a nested type were considered, including:
+
+- Storing the referenced types inside the individual type descriptions and accessing them by traversing the type description tree recursively instead of using a lookup table.
+
+  - Rejected because the IDL spec does not allow for a type description to store itself, and also because it could possibly introduce duplicate, redundant type descriptions in the tree, using up unnecessary space.
+
+- Sending referenced types in a separate service call or message.
+
+  - Rejected because needing to collate all of the referenced types on the receiver end introduces additional implementation complexity, and also increases network bandwidth with all the separate calls that must be made.
 
 
 Backwards Compatibility
