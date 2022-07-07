@@ -323,17 +323,17 @@ Runtime Type Introspection
 
 The ability to detect type mismatches and obtain the type description in the event of a mismatch in the previous two sections enables the ability to do runtime type introspection.
 
-Specifically, this feature should allow access to the data and fields in a serialized message buffer when given:
+Specifically, this feature should allow access to the data in the fields of a serialized message buffer when given:
 
-- the raw ``uint8[]`` message buffer
-- the message's type description, from inter-process type description distribution
-- the version and name of the serialization library used to serialize the message
+- the serialized message as a ``rmw_serialized_message_t``, a.k.a. a ``rcutils_uint8_array_t``
+- the message's type description, e.g. received from the aforementioned type description distribution or from a bag file
+- the serialization format, name and version, which was used to create the serialized message, e.g. ``XCDR2`` for ``Extended CDR encoding version 2``
 
 From these inputs, we should be able to access the data as fields in the message buffer through some programmatic interface, including:
 
 - a list of field names
 - a list of field types
-- access to the field by name or index as a type
+- access to the field by name or index
 
 .. code::
 
@@ -343,7 +343,7 @@ From these inputs, we should be able to access the data as fields in the message
                             │   │                            │
       serialization_format ─┘   └────────────────────────────┘
 
-Given that the scope of inputs and expected outputs is so limited, this feature should be implemented as a separate package (e.g., ``rcl_serialization``) that can be called independently by any downstream packages that might need runtime type introspection (e.g. ROS, rosbag transport, etc.)
+Given that the scope of inputs and expected outputs is so limited, this feature should ideally be implemented as a separate package, e.g. ``rcl_serialization``, that can be called independently by any downstream packages that might need runtime type introspection, e.g. introspection tools, rosbag transport, etc.
 
 Furthermore, it is important to note that this feature is distinguished from ROS 2's "dynamic" type support (``rosidl_typesupport_introspection_c``) in that "dynamic" type support generates type support code at compile time that then is not expected to change, whereas this feature aims to support any arbitrary message type descriptions at runtime.
 Crucially, this means that a node will not need access to a message's type description at compile time in order to be able to support it, since it will be able to receive and utilize the type description with this feature, in contrast to "dynamic" type support, which would require it.
@@ -362,8 +362,9 @@ Furthermore, this feature will be implemented as a C library to allow for maximu
 Plugin Interface
 ^^^^^^^^^^^^^^^^
 
-As runtime type introspection is expected to work across any arbitrary serialization library, functionality has to be built in to allow for the loading of the necessary serialization libraries required by the message type description.
-Serialization library support in this case will be provided by writing plugins that wrap the serialization libraries that can then plug in dynamically to the runtime type introspection feature using a unified plugin interface. Then, runtime type introspection will:
+As runtime type introspection is expected to work across any serialization format, the runtime type introspection interface needs to be extensible so that the necessary serialization libraries can be loaded to process the serialized message.
+Serialization format support in this case will be provided by writing plugins that wrap the serialization libraries that can then provide the runtime type introspection feature with the needed facilities.
+Then, runtime type introspection will:
 
 - enumerate the supported serialization library plugins on the machine
 - match, if possible, the serialization format specified in the message type description to an appropriate plugin (throwing a warning otherwise)
