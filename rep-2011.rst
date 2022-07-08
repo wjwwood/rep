@@ -329,7 +329,7 @@ Consider the following example:
   # D.msg
   bool d_bool
 
-The corresponding ``TypeDescription`` for ``A.msg`` will be as follows:
+The corresponding ``TypeDescription`` for ``A.msg`` will be as follows, with the referenced type descriptions accessible as ``IndividualTypeDescription`` types in the ``referenced_type_descriptions`` field of ``A``:
 
 .. code::
 
@@ -339,8 +339,8 @@ The corresponding ``TypeDescription`` for ``A.msg`` will be as follows:
                                  C_IndividualTypeDescription,
                                  D_IndividualTypeDescription]
 
-With the referenced type descriptions accessible as ``IndividualTypeDescription`` types in the ``referenced_type_descriptions`` field of ``A`` (and also for `A`, its own ``type_description`` field.
-In the case where a type description contains no referenced types (i.e., when it has no fields, or all of its fields are primitive types), the ``referenced_type_descriptions`` array will be empty.
+Note that the type description for ``A`` itself is found in the ``type_description`` field instead of the ``referenced_type_descriptions`` field.
+Additionally, in the case where a type description contains no referenced types (i.e., when it has no fields, or all of its fields are primitive types), the ``referenced_type_descriptions`` array will be empty.
 
 .. code::
 
