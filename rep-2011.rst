@@ -877,6 +877,22 @@ Similar to the integration with launch, you could run ``ros2 bag play ...`` and 
 
 That option would handle the conversion on the fly using the same mechanisms as the command line tool.
 
+Security Concerns
+=================
+
+The additional features this REP proposes do not impose significantly increased security concerns, since the message conversions happen over topics and services.
+
+More precisely, transfer functions would just be another node that interfaces with topics and services to do the message conversions, and hence would be secured by the same security mechanisms that secure nodes, topics, and services in general.
+Furthermore, transfer functions would have to be defined ahead of time (local to the machine running the transfer function), and cycles in the transfer function chain would throw assertions, making it less feasible to use the transfer function feature as an attack vector.
+The transfer functions would also generally need to be opted into by the user (e.g. in a launch file or otherwise explicitly invoked), further reducing the attack surface.
+
+Likewise, for the version hashing component, the hash gets appended to the type name that is sent via discovery.
+This means that the same security mechanisms that secure topic type names sent on discovery will secure the version hash, so there is no increase in attack surface.
+
+Of course, it could be argued that since the version hash is a hashed version of some parsed version of the type description, there is an increase in the kinds of information that an attacker would gain access to if the hash was crackable/reversible, since information about the message's structure would then be obtained.
+However, an attacker would first have to gain access to the hash by bypassing the mechanisms securing the type names, and then find a way to reverse a hash that should not be easily reversible, since the input's length and variety would make it resistant to rainbow table attacks or other brute forcing methods.
+Furthermore, using hash collisions to trick a transfer function into thinking that two types are compatible would not be a useful attack vector, since if such a type got through to the transfer function, it would just cause the transfer function to fail to do the conversion, and to even get to such a point, an attacker would have to gain access to the network to send a message to the transfer function in the first place.
+
 Rationale
 =========
 
