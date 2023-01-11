@@ -255,7 +255,9 @@ This proposal uses a hash of the type's description for this purpose.
 Type Version Hash
 ^^^^^^^^^^^^^^^^^
 
-The hash must be calculated in a stable way such that it is not changed by trivial differences that do not impact wire compatibility.
+The hash must be calculated in a stable way such that it is not changed by trivial differences that do not impact serialization compatibility.
+The hash must also be able to be calculated at runtime from information received on the wire.
+This allows subscribers to validate the received TypeDescriptions against advertised hashes, and allows dynamic publishers to invent new types and advertise their hash programmatically.
 The interface description source provided by the user, which may be a ``.msg``, ``.idl`` or other file type, is parsed into the TypeDescription object as an intermediate representation.
 This way, types coming from two sources that have the same stated name and are wire compatible will be given the same hash, even if they are defined using source text that is not exactly equal.
 Once a TypeDescription is obtained, a "pre-hash sanitizing" modification must be run on the data structure, which today only must remove field default values, which do not affect communication compatibility.
@@ -268,7 +270,7 @@ This representation includes:
 - no field default values
 - no comments
 
-Finally, the resulting filled data structure must be represented in a platform-independent format, rather than running on the in-memory native type representation.
+Finally, the resulting filled data structure must be represented in a platform-independent format, rather than running the hash function on the in-memory native type representation.
 Different languages, architectures, or compilers will produce different in-memory representations, and the hash must be consistently calculable in different contexts.
 
 The resulting data structure is hashed using SHA-256, resulting in a 256-bit (32-byte) hash value which is also generally known as a "message digest".
