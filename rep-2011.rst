@@ -260,7 +260,7 @@ The hash must also be able to be calculated at runtime from information received
 This allows subscribers to validate the received TypeDescriptions against advertised hashes, and allows dynamic publishers to invent new types and advertise their hash programmatically.
 The interface description source provided by the user, which may be a ``.msg``, ``.idl`` or other file type, is parsed into the TypeDescription object as an intermediate representation.
 This way, types coming from two sources that have the same stated name and are wire compatible will be given the same hash, even if they are defined using source text that is not exactly equal.
-Once a TypeDescription is obtained, a "pre-hash sanitizing" modification must be run on the data structure, which today only must remove field default values, which do not affect communication compatibility.
+The hash must only be computed using fields that affect communication compatibility.  Thus the representation should include:
 
 This representation includes:
 
