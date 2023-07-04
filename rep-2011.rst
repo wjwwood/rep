@@ -7,12 +7,13 @@ Content-Type: text/x-rst
 Created: 30-Nov-2021
 Post-History:
 
+
 Abstract
 ========
 
 This REP proposes patterns and approaches for evolving message, service, and action ROS interface types over time.
 
-The proposed patterns use the existing default serialization technology, i.e. CDR, in combination with new tooling to detect when types have changed and new tooling to convert between versions.
+The proposed patterns use the existing default serialization technology, i.e. CDR, in combination with new tooling to detect when types have changes and new tooling to convert between versions.
 However, it should be possible to use features provided by different, perhaps future, serialization technologies in addition to the approaches proposed in this REP.
 
 Specifically, this REP proposes that we provide tooling to convert from old versions of types to newer versions of types on demand, using user-defined transfer functions.
@@ -128,7 +129,6 @@ Terminology
 
 TODO
 
-- "type version"
 
 Specification
 =============
@@ -141,11 +141,15 @@ The proposal is to provide tooling to help users:
 
 In order to do this, this proposal describes how ROS 2 can be changed to support these tools by:
 
-- Using REP-2016 Type Description features to
+- enforcing type compatibility by version by using REP-2016 features
 
-  - detect type mismatches
-  - warn users when type enforcement is preventing two endpoints from communicating
-  - access type descriptions from nodes remotely
+  - detecting type mismatches via type hashes
+  - making it possible to see descriptions of types being used by other endpoints, and
+  - warning users when type enforcement is preventing two endpoints from communicating
+
+- providing access to the complete type description of types being used
+
+  - and making it possible to access the type description from nodes remotely
 
 - making it possible to publish and subscribe to topics using just the type description
 
@@ -157,7 +161,7 @@ This Specification section covers the conceptual overview in more detail, then d
 Conceptual Overview
 -------------------
 
-The REP-2016 Type Hash for an interface is used by ROS 2 to determine if the same type name with different type versions are being used on the same topic, so that a warning may be logged that endpoints that do not match may not communicate.
+The REP-2016 Type Hash for an interface is used by ROS 2 to determine if the same type name with different type descriptions are being used on the same topic, so that a warning may be logged that endpoints that do not match may not communicate.
 
 .. note::
 
@@ -218,7 +222,7 @@ It will continue to do this until it reaches the desired type version or it fail
                     │                                 │
                     └─────────────────────────────────┘
 
-Once the set of necessary transfer functions has been identified, the ROS graph can be changed to have one side of the topic be remapped onto a new topic name which indicates it is of a different version than what is desired, and then the transfer function can be run as a component node which subscribes to one version of the message, performs the conversion using the chain of transfer functions, then publishes the other version of the message.
+Once the set of necessary transfer functions has been identified, the ROS graph can be changed to have one side of the topic be remapped onto a new topic name which indicates it is of a different version than what is desired, and then the transfer function can be run as a component node which subscribes to one version of the message, performs the conversion using the chain of transfer functions, and then publishes the other version of the message.
 Tools will assist the user in making these remappings and running the necessary component nodes with the appropriate configurations, either from their launch file or from the command line.
 
 .. TODO::
@@ -233,7 +237,7 @@ Once the mismatched messages are flowing through the transfer functions, communi
     Services, since they are not sensitive to the many-to-many (many publisher) issue, unlike Topics, and because they do not have as many QoS settings that apply to them, they can probably have transfer functions that are plugins, rather than separate component nodes that repeat the service call, like the ros1_bridge.
     Actions will be a combination of topics and services, but will have other considerations in the tooling.
 
-In order to support this vision, these features will have been added into ROS 2 (which were also mentioned in the introduction):
+In order to support this vision, these missing features will need to be added into ROS 2 (which were also mentioned in the introduction):
 
 - enforcing type compatibility by version
 - making it possible to publish and subscribe to topics using just the type description
