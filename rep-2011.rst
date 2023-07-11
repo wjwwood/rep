@@ -20,7 +20,7 @@ Specifically, this REP proposes that we provide tooling to convert from old vers
 This approach is a good way to achieve backwards compatibility in messages over long periods of time and in a variety of scenarios, e.g. over the wire, converting bag files, or in specialized tools.
 
 This approach does not rely on specific features of the serialization technology and instead relies on the ability to communicate the full type descriptions on the wire, beyond their name and version, and use that description to introspect the values of it at runtime using reflection.
-That feature set is described in detail in REP-2016\ [#rep2016]_.
+The type description design is described in detail in REP-2016\ [#rep2016]_.
 
 This approach can be used in conjunction with serialization technology specific features like optional fields, inheritance, etc., but it works even with the simplest serialization technologies.
 This is true so long as we have the ability to introspect the messages at runtime without prior knowledge of the type description, which is a feature we also need for generic introspection tools like ``rosbag2`` and ``ros2 topic echo``.
@@ -129,6 +129,8 @@ Terminology
 
 TODO
 
+- Type Version
+
 
 Specification
 =============
@@ -141,13 +143,13 @@ The proposal is to provide tooling to help users:
 
 In order to do this, this proposal describes how ROS 2 can be changed to support these tools by:
 
-- enforcing type compatibility by version by using REP-2016 features
+- enforcing type compatibility by version
 
   - detecting type mismatches via type hashes
-  - making it possible to see descriptions of types being used by other endpoints, and
+  - making it possible to see hashes of types being used by other endpoints, and
   - warning users when type enforcement is preventing two endpoints from communicating
 
-- providing access to the complete type description of types being used
+- providing full descriptions of types being used
 
   - and making it possible to access the type description from nodes remotely
 
@@ -161,7 +163,8 @@ This Specification section covers the conceptual overview in more detail, then d
 Conceptual Overview
 -------------------
 
-The REP-2016 Type Hash for an interface is used by ROS 2 to determine if the same type name with different type descriptions are being used on the same topic, so that a warning may be logged that endpoints that do not match may not communicate.
+ROS 2 will provide a "type hash" for an interface.
+This type hash is used by ROS 2 to determine if the same type name with different type descriptions are being used on the same topic, so that a warning may be logged that endpoints that do not match may not communicate.
 
 .. note::
 
