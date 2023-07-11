@@ -145,13 +145,8 @@ In order to do this, this proposal describes how ROS 2 can be changed to support
 
 - enforcing type compatibility by version
 
-  - detecting type mismatches via type hashes
-  - making it possible to see hashes of types being used by other endpoints, and
+  - by detecting type mismatches via type hashes communicated from other endpoints, and
   - warning users when type enforcement is preventing two endpoints from communicating
-
-- providing full descriptions of types being used
-
-  - and making it possible to access the type description from nodes remotely
 
 - making it possible to publish and subscribe to topics using just the type description
 
@@ -255,7 +250,7 @@ Enforcing Type Version
 
 The Type Hash may be used as an additional constraint to determine if two endpoints (publishers and subscriptions) on a topic should communicate.
 Again, whether or not it is used will depend on the underlying middleware and how it determines if types are compatible between endpoints.
-Simpler middlewares may not do anything other than check that the type names match, in which case the hash will likely used as an extra comparison to determine compatibility.
+Simpler middlewares may not do anything other than check that the type names match, in which case the hash will likely be used as an extra comparison to determine compatibility.
 However, in more sophisticated middlewares type compatibility can be determined using more complex rules and by looking at the type descriptions themselves, and in those cases the type hash may not be used to determine matching.
 
 When creating a publisher or subscription, the caller normally provides:
@@ -347,7 +342,7 @@ Run-Time Interface Reflection
 Run-Time Interface Reflection allows access to the data in the fields of a serialized message buffer when given:
 
 - the serialized message as a ``rmw_serialized_message_t``, basically just an array of bytes as a ``rcutils_uint8_array_t``,
-- the message's type description, e.g. received from "type description distribution" or from a bag file, and
+- the message's type description, e.g. received from the ``GetTypeDescription`` service or from a bag file, and
 - the serialization format, name and version, which was used to create the serialized message, e.g. ``XCDR2`` for ``Extended CDR encoding version 2``
 
 From these inputs, we should be able to access the fields of the message from the serialized message buffer using some programmatic interface, which allows you to:
